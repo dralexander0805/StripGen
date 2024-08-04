@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Strip Generator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        h1 {
+            text-align: center;
+            color: #007BFF;
+        }
+        #intervalContainer {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #intervalContainer label {
+            font-size: 1.2em;
+        }
+        #intervalContainer input {
+            font-size: 1em;
+            padding: 5px;
+            margin: 0 10px;
+            width: 80px;
+        }
+        #intervalContainer button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1em;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        #intervalContainer button:hover {
+            background-color: #0056b3;
+        }
+        .flight-strip {
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            margin: 15px 0;
+            max-width: 900px;
+            position: relative;
+            transition: transform 0.5s ease, width 0.5s ease, background-color 0.3s;
+        }
+        .strip-section {
+            border-bottom: 1px solid #ddd;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .strip-section:last-child {
+            border-bottom: none;
+        }
+        .strip-section h2 {
+            margin: 0;
+            font-size: 1.1em;
+            color: #007BFF;
+        }
+        .strip-section p {
+            margin: 5px 0;
+            font-size: 0.95em;
+        }
+        .button-group {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .button-group button {
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.9em;
+            border-radius: 4px;
+            margin-left: 5px;
+            transition: background-color 0.3s ease;
+        }
+        .button-group button:hover {
+            background-color: #0056b3;
+        }
+        .finish-button {
+            background-color: #28A745;
+        }
+        .finish-button:hover {
+            background-color: #218838;
+        }
+        .reopen-button {
+            background-color: #FFC107;
+            display: none;
+        }
+        .reopen-button:hover {
+            background-color: #e0a800;
+        }
+        .collapsed {
+            width: 85%;
+            height: 50px;
+            overflow: hidden;
+            transform: translateX(0%);
+            transition: width 0.5s ease, transform 0.5s ease, background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1em;
+            background-color: #ddd;
+            color: #333;
+        }
+        .collapsed .strip-section {
+            display: none;
+        }
+        .collapsed .button-group .amend-button,
+        .collapsed .button-group .finish-button {
+            display: none;
+        }
+        .collapsed .reopen-button {
+            display: inline-block;
+        }
+        /* Dark Mode Styles */
+        .dark-mode {
+            background-color: #181818;
+            color: #e0e0e0;
+        }
+        .dark-mode .flight-strip {
+            background-color: #2c2c2c;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        .dark-mode .strip-section {
+            border-bottom: 1px solid #444;
+        }
+        .dark-mode .strip-section h2 {
+            color: #4a90e2;
+        }
+        .dark-mode .button-group button {
+            background-color: #333;
+            color: #e0e0e0;
+        }
+        .dark-mode .button-group button:hover {
+            background-color: #555;
+        }
+        .dark-mode .finish-button {
+            background-color: #218838;
+        }
+        .dark-mode .reopen-button {
+            background-color: #e0a800;
+        }
+    </style>
+</head>
+<body>
+    <h1>Flight Strip Generator</h1>
+    <div id="intervalContainer">
+        <label for="intervalInput">Time Between Strips (in seconds):</label>
+        <input type="number" id="intervalInput" min="1" required>
+        <button type="button" id="setIntervalButton">Set Interval</button>
+    </div>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <label>
+            <input type="checkbox" id="darkModeToggle"> Dark Mode
+        </label>
+    </div>
+    <div id="flightStripsContainer"></div>
+
+    <script>
+        let intervalId;
+
+        document.getElementById('setIntervalButton').addEventListener('click', function() {
+            const interval = parseInt(document.getElementById('intervalInput').value);
+            if (isNaN(interval) || interval <= 0) {
+                alert('Please enter a valid interval time.');
+                return;
+            }
+            
+            document.getElementById('intervalContainer').style.display = 'none';
+            generateRandomFlightStrip();  // Generate the first strip immediately
+            startGeneratingAtInterval(interval * 1000);  // Convert seconds to milliseconds
+        });
+
+        document.getElementById('darkModeToggle').addEventListener('change', function() {
+            document.body.classList.toggle('dark-mode', this.checked);
+        });
+
+        const routes = {
+            'SDF-ATL': 'CRRGO4 CRRGO BNA NEWBB IHAVE MTHEW CHPPR1',
+            'SDF-CLT': 'FEDRA5 SHIPR TAFTT PARQR3',
+            'SDF-ORD': 'STREP5 STREP BONNT VEECK5',
+            'SDF-MDW': 'STREP5 STREP DROSE FISSK6',
+            'SDF-STL': 'APALO6 APALO PXV BOOSH3',
+            'SDF-MCI': 'APALO6 APALO MCM BQS8',
+            'SDF-BWI': 'FEDRA5 SHIPR HVQ RAVNN6',
+            'SDF-DCA': 'FEDRA5 SHIPR HVQ TRUPS4',
+            'SDF-IAD': 'FEDRA5 FEDRA HVQ GIBBZ4',
+            'SDF-RDU': 'FEDRA5 FEDRA BKW ROA FRIKY ALDAN4',
+            'SDF-BNA': 'CRRGO4 CRRGO RYYMN RYYMN2',
+            'SDF-MEM': 'CRRGO4 CRRGO BWG BLUZZ3',
+            'SDF-CLE': 'FEDRA5 FEDRA DRUGA ROKNN3',
+            'SDF-DTW': 'STREP5 STREP TORRR LECTR3',
+            'SDF-PIT': 'FEDRA5 FEDRA HNN FEWGA7',
+            'SDF-PHL': 'FEDRA5 SHIPR BKW SITTR Q34 GVE PAATS4'
+        };
+
+        const eastboundAltitudes = ['31000', '33000', '35000'];
+        const westboundAltitudes = ['32000', '34000', '36000'];
+        const heavyAircraftTypes = ['B744', 'B772', 'B789', 'A380'];
+        const randomFlightNumbers = ['UAL1251', 'AAL331', 'DAL455', 'SWA2021'];
+        const randomDepartures = ['SDF'];
+        const randomArrivals = ['ATL', 'CLT', 'ORD', 'MDW', 'STL', 'MCI', 'BWI', 'DCA', 'IAD', 'RDU', 'BNA', 'MEM', 'CLE', 'DTW', 'PIT', 'PHL'];
+        const allAircraftTypes = ['B738', 'A320', 'B744', 'B752'];
+        const randomPilotNames = ['John Doe', 'Jane Smith', 'Robert Brown', 'Emily Davis'];
+        const randomEquipmentSuffixes = ['R', 'S', 'L'];
+
+        function getAltitudeBasedOnDirection(direction) {
+            return direction === 'east' 
+                ? eastboundAltitudes[Math.floor(Math.random() * eastboundAltitudes.length)]
+                : westboundAltitudes[Math.floor(Math.random() * westboundAltitudes.length)];
+        }
+
+        function getDirection(departure, arrival) {
+            const eastboundDestinations = ['ATL', 'CLT', 'ORD', 'MDW', 'STL', 'MCI', 'BWI', 'DCA', 'IAD', 'RDU', 'BNA', 'MEM', 'CLE', 'DTW', 'PIT', 'PHL'];
+            return eastboundDestinations.includes(arrival) ? 'east' : 'west';
+        }
+
+        function generateRandomFlightStrip() {
+            const flightNumber = randomFlightNumbers[Math.floor(Math.random() * randomFlightNumbers.length)];
+            const departure = randomDepartures[0]; // Fixed departure from SDF
+            let arrival;
+            do {
+                arrival = randomArrivals[Math.floor(Math.random() * randomArrivals.length)];
+            } while (arrival === departure);  // Ensure arrival is different from departure
+
+            const routeKey = `SDF-${arrival}`;
+            const routePath = routes[routeKey] || 'N/A';
+
+            const direction = getDirection(departure, arrival);
+            const altitude = getAltitudeBasedOnDirection(direction);
+
+            const aircraftType = allAircraftTypes[Math.floor(Math.random() * allAircraftTypes.length)];
+            const pilotName = randomPilotNames[Math.floor(Math.random() * randomPilotNames.length)];
+            const equipmentSuffix = randomEquipmentSuffixes[Math.floor(Math.random() * randomEquipmentSuffixes.length)];
+            
+            // Determine if aircraft is heavy
+            const isHeavy = heavyAircraftTypes.includes(aircraftType) && Math.random() < 0.5;
+
+            const equipment = isHeavy ? `H/${aircraftType}/${equipmentSuffix}` : `${aircraftType}/${equipmentSuffix}`;
+            const departureTime = '12:00';  // Fixed time for simplicity
+            const arrivalTime = '14:00';    // Fixed time for simplicity
+
+            const flightStripsContainer = document.getElementById('flightStripsContainer');
+            const flightStrip = document.createElement('div');
+            flightStrip.className = 'flight-strip';
+
+            flightStrip.innerHTML = `
+                <div class="button-group">
+                    <button class="amend-button">Amend</button>
+                    <button class="finish-button">Finish</button>
+                    <button class="reopen-button">Reopen</button>
+                </div>
+                <div class="strip-section">
+                    <h2>Flight Info</h2>
+                    <p><strong>Flight Number:</strong> <span class="flight-number">${flightNumber}</span></p>
+                    <p><strong>Departure:</strong> <span class="departure">${departure}</span></p>
+                    <p><strong>Arrival:</strong> <span class="arrival">${arrival}</span></p>
+                </div>
+                <div class="strip-section">
+                    <h2>Route</h2>
+                    <p><span class="route">${routePath}</span></p>
+                </div>
+                <div class="strip-section">
+                    <h2>Aircraft</h2>
+                    <p><strong>Type:</strong> <span class="aircraft">${equipment}</span></p>
+                    <p><strong>Pilot:</strong> <span class="pilot">${pilotName}</span></p>
+                </div>
+                <div class="strip-section">
+                    <h2>Times</h2>
+                    <p><strong>Departure:</strong> <span class="departure-time">${departureTime}</span></p>
+                    <p><strong>Arrival:</strong> <span class="arrival-time">${arrivalTime}</span></p>
+                </div>
+                <div class="strip-section">
+                    <h2>Altitude</h2>
+                    <p><strong>Altitude:</strong> <span class="altitude">${altitude} ft</span></p>
+                </div>
+            `;
+
+            flightStripsContainer.appendChild(flightStrip);
+
+            // Add event listeners to the buttons
+            const amendButton = flightStrip.querySelector('.amend-button');
+            const finishButton = flightStrip.querySelector('.finish-button');
+            const reopenButton = flightStrip.querySelector('.reopen-button');
+
+            amendButton.addEventListener('click', () => amendFlightStrip(flightStrip));
+            finishButton.addEventListener('click', () => markAsFinished(flightStrip));
+            reopenButton.addEventListener('click', () => reopenFlightStrip(flightStrip));
+        }
+
+        function amendFlightStrip(flightStrip) {
+            const route = flightStrip.querySelector('.route');
+            const altitude = flightStrip.querySelector('.altitude');
+            
+            const newRoute = prompt('Edit Route', route.textContent);
+            if (newRoute !== null) {
+                route.textContent = newRoute;
+            }
+
+            const newAltitude = prompt('Edit Altitude (in ft)', altitude.textContent.split(' ')[0]);
+            if (newAltitude !== null) {
+                altitude.textContent = `${newAltitude} ft`;
+            }
+        }
+
+        function markAsFinished(flightStrip) {
+            flightStrip.classList.add('collapsed');
+            const callsign = flightStrip.querySelector('.flight-number').textContent;
+            flightStrip.innerHTML = `<div class="collapsed">${callsign}</div>`;
+        }
+
+        function reopenFlightStrip(flightStrip) {
+            flightStrip.classList.remove('collapsed');
+            generateRandomFlightStrip(); // Repopulate the content
+        }
+
+        function startGeneratingAtInterval(interval) {
+            if (intervalId) clearInterval(intervalId);  // Clear any existing interval
+            intervalId = setInterval(generateRandomFlightStrip, interval);
+        }
+    </script>
+</body>
+</html>
